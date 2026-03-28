@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Email Header Processor</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0f0f14;
+    --surface: #17171f;
+    --surface2: #1e1e2a;
+    --border: #2a2a3a;
+    --text: #e2e2f0;
+    --muted: #6b6b8a;
+    --accent-green: #7effa0;
+    --accent-blue: #7eb8ff;
+    --accent-red: #ff8fa3;
+    --accent-gray: #8888aa;
+    --font-mono: 'DM Mono', monospace;
+    --font-ui: 'DM Sans', sans-serif;
+  }
+
+  html, body {
+    height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-ui);
+    overflow: hidden;
+  }
+
+  /* ── Layout ── */
+  .app {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    padding: 18px 20px 12px;
+    gap: 14px;
+  }
+
+  /* ── Header ── */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+  }
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .logo-icon {
+    width: 34px; height: 34px;
+    background: linear-gradient(135deg, var(--accent-green), var(--accent-blue));
+    border-radius: 9px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 17px;
+    flex-shrink: 0;
+  }
+  .logo-text h1 {
+    font-size: 15px; font-weight: 600; letter-spacing: -.3px;
+    line-height: 1.2;
+  }
+  .logo-text p {
+    font-size: 11px; color: var(--muted); margin-top: 1px;
+  }
+
+  /* ── Toolbar ── */
+  .toolbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+    flex-wrap: wrap;
+  }
+  .toolbar-group {
+    display: flex; gap: 6px;
+  }
+
+  button {
+    font-family: var(--font-ui);
+    font-size: 12.5px;
+    font-weight: 600;
+    border: none;
+    border-radius: 7px;
+    padding: 7px 14px;
+    cursor: pointer;
+    display: flex; align-items: center; gap: 5px;
+    transition: filter .15s, transform .1s;
+    letter-spacing: .01em;
+    white-space: nowrap;
+  }
+  button:active { transform: scale(.96); }
+  button:hover { filter: brightness(1.12); }
+
+  .btn-process   { background: var(--accent-green); color: #0f1a12; }
+  .btn-processplus { background: var(--accent-blue); color: #0b1220; }
+  .btn-save      { background: var(--accent-red);  color: #200a10; }
+  .btn-clear     { background: var(--surface2); color: var(--muted); border: 1px solid var(--border); }
+  .btn-swap      { background: var(--surface2); color: var(--muted); border: 1px solid var(--border); margin-left: auto; }
+
+  /* ── Panels ── */
+  .panels {
+    display: grid;
+    grid-template-columns: 1fr 6px 1fr;
+    gap: 0;
+    flex: 1;
+    min-height: 0;
+  }
+
+  .panel {
+    display: flex;
+    flex-direction: column;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    min-height: 0;
+  }
+
+  .panel-header {
+    padding: 9px 14px 8px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+  }
+  .panel-label {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .panel-badge {
+    font-size: 10px;
+    font-family: var(--font-mono);
+    background: var(--surface2);
+    color: var(--muted);
+    padding: 2px 7px;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+  }
+
+  textarea {
+    flex: 1;
+    background: transparent;
+    border: none;
+    outline: none;
+    color: var(--text);
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    line-height: 1.65;
+    padding: 12px 14px;
+    resize: none;
+    min-height: 0;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+  textarea::placeholder { color: var(--muted); font-style: italic; }
+  textarea:focus { background: #18181f; }
+
+  /* ── Sash ── */
+  .sash {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: col-resize;
+    user-select: none;
+    z-index: 10;
+  }
+  .sash::before {
+    content: '';
+    width: 2px;
+    height: 100%;
+    background: var(--border);
+    border-radius: 2px;
+    transition: background .15s;
+  }
+  .sash:hover::before { background: var(--accent-blue); }
+
+  /* ── Status bar ── */
+  .statusbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 5px 10px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    font-size: 11.5px;
+    color: var(--muted);
+    flex-shrink: 0;
+    gap: 12px;
+  }
+  .statusbar .msg { display: flex; align-items: center; gap: 6px; transition: color .2s; }
+  .statusbar .dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--accent-green);
+    flex-shrink: 0;
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse {
+    0%,100% { opacity: 1; }
+    50% { opacity: .4; }
+  }
+  .statusbar .meta { display: flex; gap: 14px; font-family: var(--font-mono); font-size: 11px; }
+
+  /* ── Toast ── */
+  .credit {
+    position: fixed;
+    bottom: 10px;
+    right: 14px;
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    color: var(--muted);
+    opacity: 0.45;
+    letter-spacing: .04em;
+    pointer-events: none;
+    user-select: none;
+  }
+
+  .toast {
+    position: fixed; bottom: 54px; left: 50%; transform: translateX(-50%) translateY(8px);
+    background: var(--surface2); border: 1px solid var(--border);
+    color: var(--text); padding: 8px 18px;
+    border-radius: 8px; font-size: 12.5px;
+    opacity: 0; pointer-events: none;
+    transition: opacity .2s, transform .2s;
+    z-index: 999;
+    white-space: nowrap;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  /* ── Diff highlight ── */
+  .diff-added   { background: rgba(126,255,160,.12); color: var(--accent-green); }
+  .diff-removed { background: rgba(255,143,163,.1);  color: var(--accent-red); text-decoration: line-through; }
+
+  /* ── Responsive ── */
+  @media (max-width: 640px) {
+    html, body { overflow: auto; }
+    .app { overflow: auto; height: auto; }
+    .panels { grid-template-columns: 1fr; grid-template-rows: 400px 6px 400px; }
+    .sash { cursor: row-resize; height: 6px; width: 100%; }
+    .sash::before { width: 100%; height: 2px; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header>
+    <div class="logo">
+      <div class="logo-icon">📧</div>
+      <div class="logo-text">
+        <h1>Email Header Processor</h1>
+        <p>Anonymize, strip & sanitize email headers</p>
+      </div>
+    </div>
+  </header>
+
+  <div class="toolbar">
+    <div class="toolbar-group">
+      <button class="btn-process" onclick="doProcess()">⚡ Process</button>
+      <button class="btn-processplus" onclick="doProcessPlus()">⚡ Process+</button>
+    </div>
+    <div class="toolbar-group">
+      <button class="btn-save" onclick="doSave()">💾 Save Output</button>
+      <button class="btn-clear" onclick="doClear()">🗑 Clear</button>
+    </div>
+
+  </div>
+
+  <div class="panels" id="panels">
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-label">Input</span>
+        <span class="panel-badge" id="in-lines">0 lines</span>
+      </div>
+      <textarea id="input-box" placeholder="Paste your raw email headers here…" spellcheck="false"></textarea>
+    </div>
+
+    <div class="sash" id="sash"></div>
+
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-label">Output</span>
+        <span class="panel-badge" id="out-lines">0 lines</span>
+      </div>
+      <textarea id="output-box" placeholder="Processed result will appear here…" spellcheck="false" readonly></textarea>
+    </div>
+  </div>
+
+  <div class="statusbar">
+    <div class="msg">
+      <span class="dot"></span>
+      <span id="status-msg">Ready — paste your email in the Input box and click Process</span>
+    </div>
+    <div class="meta">
+      <span style="font-family:var(--font-mono);font-size:11px;color:var(--muted);opacity:.6;letter-spacing:.04em;">cmh11 · Hatim EL KHATTABI</span>
+    </div>
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── Core logic (ported from Python) ──────────────────────────────────────────
+
+const STRIP_HEADERS = new Set([
+  "delivered-to","x-received","arc-seal","arc-message-signature",
+  "arc-authentication-results","authentication-results","return-path",
+  "received-spf","dkim-signature"
+]);
+
+function processEmail(content) {
+  // Anonymize From: email domain
+  content = content.replace(
+    /^(From:.*?<[^@<>\n]+)@[^<>\n]+(>)/gm,
+    '$1@[P_RPATH]$2'
+  );
+
+  // Sender: handling
+  if (/^Sender:/im.test(content)) {
+    content = content.replace(
+      /^(Sender:.*?)@[^\s>\n]+/gim,
+      '$1@[RDNS]'
+    );
+  } else {
+    content = content.replace(
+      /^(From:.*)$/m,
+      '$1\nSender: support@[RDNS]'
+    );
+  }
+
+  // Message-ID anonymization
+  content = content.replace(
+    /^(Message-ID:\s*<?[^@\s<>\n]+)@/gim,
+    '$1[EID]@'
+  );
+
+  return content;
+}
+
+function processEmailPlus(content) {
+  content = processEmail(content);
+
+  // Strip unwanted headers (including folded continuations)
+  const lines = content.split('\n');
+  const filtered = [];
+  let skip = false;
+
+  for (const line of lines) {
+    if (skip && line.length > 0 && (line[0] === ' ' || line[0] === '\t')) {
+      continue;
+    }
+    skip = false;
+    const m = line.match(/^([A-Za-z0-9_-]+)\s*:/);
+    if (m && STRIP_HEADERS.has(m[1].toLowerCase())) {
+      skip = true;
+      continue;
+    }
+    filtered.push(line);
+  }
+  content = filtered.join('\n');
+
+  // Inject CC if absent
+  if (!/^CC\s*:/im.test(content)) {
+    content = content.replace(
+      /^(To:.*)$/m,
+      '$1\nCC: [*to]'
+    );
+  }
+
+  return content;
+}
+
+// ── UI helpers ────────────────────────────────────────────────────────────────
+
+const inputBox  = document.getElementById('input-box');
+const outputBox = document.getElementById('output-box');
+const statusMsg = document.getElementById('status-msg');
+const inLines   = document.getElementById('in-lines');
+const outLines  = document.getElementById('out-lines');
+const charsIn   = null;
+const toastEl   = document.getElementById('toast');
+
+let toastTimer = null;
+
+function toast(msg) {
+  toastEl.textContent = msg;
+  toastEl.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toastEl.classList.remove('show'), 2200);
+}
+
+function setStatus(msg, color = '#a6e3a1') {
+  statusMsg.textContent = msg;
+  statusMsg.style.color = color;
+}
+
+function updateCounters() {
+  const iVal = inputBox.value;
+  const oVal = outputBox.value;
+  const iL = iVal ? iVal.split('\n').length : 0;
+  const oL = oVal ? oVal.split('\n').length : 0;
+  inLines.textContent  = iL + ' line' + (iL !== 1 ? 's' : '');
+  outLines.textContent = oL + ' line' + (oL !== 1 ? 's' : '');
+
+}
+
+inputBox.addEventListener('input', updateCounters);
+
+// ── Actions ───────────────────────────────────────────────────────────────────
+
+function doProcess() {
+  const raw = inputBox.value.trim();
+  if (!raw) { toast('⚠ Paste email content first'); return; }
+  outputBox.value = processEmail(raw);
+  setStatus('⚡ Processing complete');
+  updateCounters();
+}
+
+function doProcessPlus() {
+  const raw = inputBox.value.trim();
+  if (!raw) { toast('⚠ Paste email content first'); return; }
+  outputBox.value = processEmailPlus(raw);
+  setStatus('⚡ Process+ complete — headers stripped, CC injected');
+  updateCounters();
+}
+
+function doSave() {
+  const output = outputBox.value.trim();
+  if (!output) { toast('⚠ Nothing to save — process an email first'); return; }
+  const blob = new Blob([output], { type: 'text/plain' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url; a.download = 'updatedEmail.txt';
+  a.click();
+  URL.revokeObjectURL(url);
+  setStatus('💾 File saved as updatedEmail.txt');
+  toast('💾 Saved!');
+}
+
+function doClear() {
+  inputBox.value = '';
+  outputBox.value = '';
+  setStatus('🗑 Cleared');
+  updateCounters();
+}
+
+function doSwap() {
+  const out = outputBox.value;
+  if (!out) { toast('⚠ No output to swap'); return; }
+  inputBox.value = out;
+  outputBox.value = '';
+  setStatus('⇄ Output moved to input');
+  updateCounters();
+  inputBox.focus();
+}
+
+// ── Sash drag (resizable panels) ─────────────────────────────────────────────
+
+const sash   = document.getElementById('sash');
+const panels = document.getElementById('panels');
+let dragging = false;
+
+sash.addEventListener('mousedown', e => {
+  dragging = true;
+  document.body.style.cursor = 'col-resize';
+  document.body.style.userSelect = 'none';
+  e.preventDefault();
+});
+
+document.addEventListener('mousemove', e => {
+  if (!dragging) return;
+  const rect = panels.getBoundingClientRect();
+  const totalW = rect.width - 6; // subtract sash
+  let left = e.clientX - rect.left;
+  left = Math.max(200, Math.min(left, totalW - 200));
+  const right = totalW - left;
+  panels.style.gridTemplateColumns = `${left}px 6px ${right}px`;
+});
+
+document.addEventListener('mouseup', () => {
+  if (dragging) {
+    dragging = false;
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+  }
+});
+
+// Touch support for sash
+sash.addEventListener('touchstart', e => {
+  dragging = true; e.preventDefault();
+}, { passive: false });
+
+document.addEventListener('touchmove', e => {
+  if (!dragging) return;
+  const rect = panels.getBoundingClientRect();
+  const totalW = rect.width - 6;
+  let left = e.touches[0].clientX - rect.left;
+  left = Math.max(200, Math.min(left, totalW - 200));
+  panels.style.gridTemplateColumns = `${left}px 6px ${totalW - left}px`;
+}, { passive: true });
+
+document.addEventListener('touchend', () => { dragging = false; });
+
+// Keyboard shortcut: Ctrl+Enter = Process+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && e.shiftKey) { doProcessPlus(); e.preventDefault(); }
+  else if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { doProcess(); e.preventDefault(); }
+});
+
+updateCounters();
+</script>
+</body>
+</html>
