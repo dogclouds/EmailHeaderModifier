@@ -259,9 +259,14 @@
 
     function processEmail(content) {
       content = content.replace(
-        /^(From:.*?<[^@<>\n]+)@[^<>\n]+(>)/gm,
-        '$1@[P_RPATH]$2'
-      );
+  /^(From:\s*)(.*?)(<?)([^@\s<>\n]+)@([^\s<>\n>]+)(>?)$/gim,
+  (match, prefix, beforeEmail, open, local, domain, close) => {
+    if (open && close) {
+      return `${prefix}${beforeEmail}${open}${local}@[P_RPATH]${close}`;
+    }
+    return `${prefix}${beforeEmail}${local}@[P_RPATH]`;
+  }
+);
 
       if (/^Sender:/im.test(content)) {
         content = content.replace(
