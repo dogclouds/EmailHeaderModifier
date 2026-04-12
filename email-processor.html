@@ -271,12 +271,12 @@
       if (/^Sender:/im.test(content)) {
         content = content.replace(
           /^(Sender:.*?)@[^\s>\n]+/gim,
-          '$1@[RDNS]'
+          '$1@[DRDNS]'
         );
       } else {
         content = content.replace(
           /^(From:.*)$/m,
-          '$1\nSender: support@[RDNS]'
+          '$1\nSender: support@[DRDNS]'
         );
       }
 
